@@ -125,7 +125,9 @@ extension Message {
     /// - Throws:
     public func serializeTCP() throws -> Data {
         let data = try serialize()
-        precondition(data.count <= UInt16.max)
+       guard data.count <= UInt16.max else {
+           throw DecodeError.invalidMessageSize
+       }
         return UInt16(truncatingIfNeeded: data.count).bytes + data
     }
 
@@ -181,13 +183,17 @@ extension Message {
     /// - Parameter bytes: the received bytes.
     /// - Throws:
     public init(deserializeTCP bytes: Data) throws {
-        precondition(bytes.count >= 2)
+       guard bytes.count >= 2 else {
+           throw DecodeError.invalidMessageSize
+       }
         var position = bytes.startIndex
         let size = try Int(UInt16(data: bytes, position: &position))
 
         // strip size bytes (tcp only?)
         let bytes = Data(bytes[2..<2+size]) // copy? :(
-        precondition(bytes.count == Int(size))
+       guard bytes.count == Int(size) else {
+           throw DecodeError.invalidMessageSize
+       }
 
         try self.init(deserialize: bytes)
     }
