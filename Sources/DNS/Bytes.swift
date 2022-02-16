@@ -188,9 +188,14 @@ extension Message {
        }
         var position = bytes.startIndex
         let size = try Int(UInt16(data: bytes, position: &position))
+       
+       let endIndex = size + 2
+       guard endIndex <= bytes.count else {
+          throw DecodeError.invalidDataSize
+       }
 
         // strip size bytes (tcp only?)
-        let bytes = Data(bytes[2..<2+size]) // copy? :(
+        let bytes = Data(bytes[2..<endIndex]) // copy? :(
        guard bytes.count == Int(size) else {
            throw DecodeError.invalidMessageSize
        }
