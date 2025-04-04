@@ -11,6 +11,7 @@ enum DecodeError: Swift.Error {
     case invalidIntegerSize
     case invalidIPAddress
     case invalidDataSize
+    case invalidQuestion
 }
 
 func deserializeName(_ data: Data, _ position: inout Data.Index) throws -> String {
@@ -23,13 +24,10 @@ func deserializeName(_ data: Data, _ position: inout Data.Index) throws -> Strin
         let step = data[position]
         if step & 0xc0 == 0xc0 {
             let offset = Int(try UInt16(data: data, position: &position) ^ 0xc000)
-            guard var pointer = data.index(data.startIndex, offsetBy: offset, limitedBy: data.endIndex) else {
-                throw DecodeError.invalidLabelOffset
-            }
             // Prevent cyclic references
             // Its safe to assume the pointer is to an earlier label
             // See https://www.ietf.org/rfc/rfc1035.txt 4.1.4
-            guard pointer < startPosition else {
+            guard var pointer = data.index(data.startIndex, offsetBy: offset, limitedBy: startPosition - 1) else {
                 throw DecodeError.invalidLabelOffset
             }
             components += try deserializeName(data, &pointer).components(separatedBy: ".").filter({ $0 != "" })
@@ -108,6 +106,8 @@ func deserializeRecord(_ data: Data, _ position: inout Data.Index) throws -> Res
     case .pointer: return try PointerRecord(deserialize: data, position: &position, common: common)
     case .alias: return try AliasRecord(deserialize: data, position: &position, common: common)
     case .startOfAuthority: return try StartOfAuthorityRecord(deserialize: data, position: &position, common: common)
+    case .nameServer: return try NameServerRecord(deserialize: data, position: &position, common: common)
+    case .mailExchange: return try MailExchangeRecord(deserialize: data, position: &position, common: common)
     default: return try Record(deserialize: data, position: &position, common: common)
     }
 }
@@ -251,6 +251,54 @@ extension Record: ResourceRecord {
         buffer.append(contentsOf: UInt16(data.count).bytes + data)
     }
 }
+
+extension NameServerRecord: ResourceRecord {
+    init(deserialize data: Data, position: inout Data.Index, common: RecordCommonFields) throws {
+        (name, type, unique, internetClass, ttl) = common
+        let length = try UInt16(data: data, position: &position)
+        let expectedPosition = position + Data.Index(length)
+        self.nameServer = try deserializeName(data, &position)
+        guard position == expectedPosition else {
+            throw DecodeError.invalidDataSize
+        }
+    }
+
+    public func serialize(onto buffer: inout Data, labels: inout Labels) throws {
+        try serializeRecordCommonFields((name, type, unique, internetClass, ttl), onto: &buffer, labels: &labels)
+        buffer += [0, 0]
+        let startPosition = buffer.endIndex
+        try serializeName(nameServer, onto: &buffer, labels: &labels)
+        // Set the length before the data field
+        let length = UInt16(buffer.endIndex - startPosition)
+        buffer.replaceSubrange((startPosition - 2)..<startPosition, with: length.bytes)
+    }
+}
+
+extension MailExchangeRecord: ResourceRecord {
+    init(deserialize data: Data, position: inout Data.Index, common: RecordCommonFields) throws {
+        (name, type, unique, internetClass, ttl) = common
+        let length = try UInt16(data: data, position: &position)
+        let expectedPosition = position + Data.Index(length)
+        self.priority = try UInt16(data: data, position: &position)
+        self.exchangeServer = try deserializeName(data, &position)
+        
+        guard position == expectedPosition else {
+            throw DecodeError.invalidDataSize
+        }
+    }
+
+    public func serialize(onto buffer: inout Data, labels: inout Labels) throws {
+        try serializeRecordCommonFields((name, type, unique, internetClass, ttl), onto: &buffer, labels: &labels)
+        buffer += [0, 0]
+        let startPosition = buffer.endIndex
+        buffer += priority.bytes
+        try serializeName(exchangeServer, onto: &buffer, labels: &labels)
+        // Set the length before the data field
+        let length = UInt16(buffer.endIndex - startPosition)
+        buffer.replaceSubrange((startPosition - 2)..<startPosition, with: length.bytes)
+    }
+}
+
 
 extension HostRecord: ResourceRecord {
     init(deserialize data: Data, position: inout Data.Index, common: RecordCommonFields) throws {

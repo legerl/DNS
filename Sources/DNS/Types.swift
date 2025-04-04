@@ -25,6 +25,9 @@ public struct Question {
 
     init(deserialize data: Data, position: inout Data.Index) throws {
         name = try deserializeName(data, &position)
+        guard data.endIndex - position >= 4 else {
+            throw DecodeError.invalidQuestion
+        }
         type = try ResourceRecordType(data: data, position: &position)
         unique = data[position] & 0x80 == 0x80
         let rawInternetClass = try UInt16(data: data, position: &position)
@@ -93,6 +96,64 @@ public struct Record {
         self.unique = unique
         self.ttl = ttl
         self.data = data
+    }
+}
+
+public struct NameServerRecord {
+    public var name: String
+    public var type: UInt16
+    public var internetClass: InternetClass
+    public var unique: Bool
+    public var ttl: UInt32
+    public var nameServer: String
+
+    public init(name: String, type: UInt16, internetClass: InternetClass, unique: Bool, ttl: UInt32, nameServer: String) {
+        self.name = name
+        self.type = type
+        self.internetClass = internetClass
+        self.unique = unique
+        self.ttl = ttl
+        self.nameServer = nameServer
+    }
+}
+
+extension NameServerRecord: Hashable {
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(nameServer.hashValue)
+    }
+
+    public static func == (lhs: NameServerRecord, rhs: NameServerRecord) -> Bool {
+        return lhs.name == rhs.name && lhs.nameServer == rhs.nameServer
+    }
+}
+
+public struct MailExchangeRecord {
+    public var name: String
+    public var type: UInt16
+    public var internetClass: InternetClass
+    public var unique: Bool
+    public var ttl: UInt32
+    public var priority: UInt16
+    public var exchangeServer: String
+
+    public init(name: String, type: UInt16, internetClass: InternetClass, unique: Bool, ttl: UInt32, priority: UInt16, exchangeServer: String) {
+        self.name = name
+        self.type = type
+        self.internetClass = internetClass
+        self.unique = unique
+        self.ttl = ttl
+        self.priority = priority
+        self.exchangeServer = exchangeServer
+    }
+}
+
+extension MailExchangeRecord: Hashable {
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(exchangeServer.hashValue)
+    }
+
+    public static func == (lhs: MailExchangeRecord, rhs: MailExchangeRecord) -> Bool {
+        return lhs.name == rhs.name && lhs.exchangeServer == rhs.exchangeServer
     }
 }
 
@@ -206,6 +267,14 @@ public struct AliasRecord {
     public var internetClass: InternetClass
     public var ttl: UInt32
     public var canonicalName: String
+
+    public init(name: String, unique: Bool, internetClass: InternetClass, ttl: UInt32, canonicalName: String) {
+        self.name = name
+        self.unique = unique
+        self.internetClass = internetClass
+        self.ttl = ttl
+        self.canonicalName = canonicalName
+    }
 }
 
 // https://tools.ietf.org/html/rfc1035#section-3.3.13

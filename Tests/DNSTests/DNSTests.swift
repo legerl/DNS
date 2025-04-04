@@ -16,7 +16,11 @@ class DNSTests: XCTestCase {
             ("testSerializeName", testSerializeName),
             ("testSerializeNameCondensed", testSerializeNameCondensed),
             ("testLinuxTestSuiteIncludesAllTests", testLinuxTestSuiteIncludesAllTests),
-            ("testDeserializeFuzzMessages", testDeserializeFuzzMessages)
+            ("testDeserializeFuzzMessages", testDeserializeFuzzMessages),
+            ("testDeserializeInvalidQuestion", testDeserializeInvalidQuestion),
+            ("testDeserializeInvalidLabel", testDeserializeInvalidLabel),
+            ("testNameServerRecordLabel", testNameServerRecord),
+            ("testMXRecordLabel", testMailExchangeRecord)
         ]
     }
 
@@ -55,6 +59,48 @@ class DNSTests: XCTestCase {
         let pointer0copy = try! PointerRecord(deserialize: serialized0, position: &position, common: rcf)
 
         XCTAssertEqual(pointer0, pointer0copy)
+    }
+
+    func testNameServerRecord() {
+        var labels0 = Labels()
+        var serialized0 = Data()
+        let nameServer = NameServerRecord(name: "google.com.", type: 1, internetClass: .nameServer, unique: true, ttl: 3600, nameServer: "ns1.google.com.")
+        try! nameServer.serialize(onto: &serialized0, labels: &labels0)
+
+        var labels1 = Labels()
+        var serialized1 = Data()
+        let nameServer1 = NameServerRecord(name: "google.com.", type: 1, internetClass: .nameServer, unique: true, ttl: 3600, nameServer: "ns1.google.com.")
+        try! nameServer1.serialize(onto: &serialized1, labels: &labels1)
+
+        XCTAssertEqual(serialized0.hex, serialized1.hex)
+
+        var position = serialized0.startIndex
+        let rcf = try! deserializeRecordCommonFields(serialized0, &position)
+
+        let nameServer0Copy = try! NameServerRecord(deserialize: serialized0, position: &position, common: rcf)
+
+        XCTAssertEqual(nameServer, nameServer0Copy)
+    }
+    
+    func testMailExchangeRecord() {
+        var labels0 = Labels()
+        var serialized0 = Data()
+        let nameServer = MailExchangeRecord(name: "google.com.", type: 1, internetClass: .nameServer, unique: true, ttl: 3600, priority: 40, exchangeServer: "ex1.google.com.")
+        try! nameServer.serialize(onto: &serialized0, labels: &labels0)
+
+        var labels1 = Labels()
+        var serialized1 = Data()
+        let nameServer1 = MailExchangeRecord(name: "google.com.", type: 1, internetClass: .nameServer, unique: true, ttl: 3600, priority: 40, exchangeServer: "ex1.google.com.")
+        try! nameServer1.serialize(onto: &serialized1, labels: &labels1)
+
+        XCTAssertEqual(serialized0.hex, serialized1.hex)
+
+        var position = serialized0.startIndex
+        let rcf = try! deserializeRecordCommonFields(serialized0, &position)
+
+        let nameServer0Copy = try! MailExchangeRecord(deserialize: serialized0, position: &position, common: rcf)
+
+        XCTAssertEqual(nameServer, nameServer0Copy)
     }
 
     func testMessage1() {
@@ -123,7 +169,17 @@ class DNSTests: XCTestCase {
 
     func testDeserializeFuzzMessages() {
         let data = Data(hex: "000084000001000200000002085f61692e706c6179045f746370065f6c6f63616c00000c0001c00c000c0001000000780013076578616d706c65085f616972706c6179c015c03200210001000000780015000000001b58076578616d706c65056c6f63616c00c057000100010000007800040a000102c00c000c000100000078000c0b68656c6c6f3d776f726c64")!
-        _ = try? Message(deserialize: data) // should either deserialize or throw, but not sigfault
+        _ = try? Message(deserialize: data) // should either deserialize or throw, but not segfault
+    }
+
+    func testDeserializeInvalidQuestion() {
+        let data = Data(hex: "14bf8ba7a13993cdb5346356008119")!
+        _ = try? Message(deserialize: data) // should either deserialize or throw, but not segfault
+    }
+
+    func testDeserializeInvalidLabel() {
+        let data = Data(hex: "e983e8f7b88aed06c83f590fc00c6e5a6d0fe8898a21dd")!
+        _ = try? Message(deserialize: data) // should either deserialize or throw, but not segfault
     }
 
     func testDeserializeCorruptedName() {

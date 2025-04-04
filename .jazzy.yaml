@@ -1,14 +1,16 @@
-xcodebuild_arguments:
-  - -scheme
-  - DNS
 module: DNS
 author: Bouke Haarsma
 author_url: https://twitter.com/BoukeHaarsma
-output: ../DNS-Docs/master
+output: .docs
 theme: fullwidth
 clean: true
 github_url: https://github.com/Bouke/DNS
+github_file_prefix: https://github.com/Bouke/DNS/tree/master
 dash_url: http://boukehaarsma.nl/DNS/DNS.xml
+documentation: docs/*.md
+abstract: docs/api/*.md
+swift_build_tool: spm
+hide_documentation_coverage: yes
 custom_categories:
   - name: Querying
     children:
@@ -28,6 +30,7 @@ custom_categories:
       - PointerRecord
       - Record
       - ServiceRecord
+      - StartOfAuthorityRecord
       - TextRecord
   - name: Resource Data Types
     children:
@@ -36,4 +39,5 @@ custom_categories:
       - IP
       - IPv4
       - IPv6
+      - Labels
 
